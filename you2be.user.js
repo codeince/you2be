@@ -4,8 +4,9 @@
 // @description    Surf YouTube faster
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
-// @version        1.0.2
+// @version        1.0.3
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
+// @updateURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.ico
 // @match          *://youtu.be/*
 // @match          *://youtube.com/shorts/*
@@ -14,10 +15,11 @@
 // @match          *://m.youtube.com/watch*
 // @match          *://www.youtube.com/shorts/*
 // @match          *://www.youtube.com/watch*
-// @grant GM_getValue
-// @grant GM_setValue
-// @grant GM_registerMenuCommand
-// @grant GM_unregisterMenuCommand
+// @grant GM.getValue
+// @grant GM.setValue
+// @grant GM.registerMenuCommand
+// @grant GM.unregisterMenuCommand
+// @top-level-await
 // @run-at         document-start
 // ==/UserScript==
 
@@ -47,17 +49,23 @@ function getLang() {
 const translation = i18n[getLang()];
 
 const keepShortsId = "keepShorts";
-let keepShorts = GM_getValue(keepShortsId, false);
+let keepShorts = await GM.getValue(keepShortsId, false);
 
-function registerMenu() {
-	const caption = keepShorts ? translation.keepShortsOn : translation.keepShortsOff;
-	GM_registerMenuCommand(caption, () => {
-		keepShorts = !keepShorts;
-		GM_setValue(keepShortsId, keepShorts);
-		GM_unregisterMenuCommand(caption);
-		registerMenu();
-		location.reload();
-	});
+async function registerMenu() {
+	const caption = keepShorts
+		? translation.keepShortsOn
+		: translation.keepShortsOff;
+	await GM.registerMenuCommand(
+		caption,
+		async () => {
+			keepShorts = !keepShorts;
+			await GM.setValue(keepShortsId, keepShorts);
+			await GM.unregisterMenuCommand(keepShortsId);
+			registerMenu();
+			location.reload();
+		},
+		{ id: keepShortsId },
+	);
 }
 registerMenu();
 
