@@ -18,7 +18,7 @@ const url = new URL(location.href);
 const keptParams = ["v", "t", "list", "index"];
 
 /**
- * Removes all extra search params
+ * Removes all extra query params
  * @param {URL} target
  * @param {URL} source
  * @returns {URL}
@@ -30,6 +30,19 @@ function cleanParams(target, source) {
 		}
 	}
 	return target;
+}
+
+/**
+ * Adds s if t query parameter is just a number
+ * @param {URL} source
+ * @returns {URL}
+ */
+function betterTime(source) {
+	const value = source.searchParams.get("t");
+	if (/^[0-9]*$/.test(value)) {
+		source.searchParams.set("t", `${value}s`)
+  }
+  return source;
 }
 
 /**
@@ -50,10 +63,6 @@ function getVideoId(source) {
 		}
 	}
 
-	if (videoId && /^\d*$/.test(videoId)) {
-		videoId += "s";
-	}
-
 	return videoId;
 }
 
@@ -66,7 +75,8 @@ if (videoId) {
 		url.hostname === "youtu.be" ? "https://youtube.com" : url.origin,
 	);
 	target.searchParams.set("v", videoId);
-	cleanParams(target, url);
+  cleanParams(target, url);
+  betterTime(target);
 }
 
 if (target && target.href !== url.href) {
