@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Shortener
 // @namespace    https://github.com/codeince/you2be
-// @version      1.0.1
+// @version      1.0.2
 // @downloadURL https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon https://raw.githubusercontent.com/codeince/you2be/main/icon.ico
 // @match        *://youtu.be/*
@@ -48,6 +48,10 @@ function getVideoId(source) {
 		} else if (source.pathname === "/watch") {
 			videoId = source.searchParams.get("v");
 		}
+	}
+
+	if (videoId && /^\d*$/.test(videoId)) {
+		videoId += "s";
 	}
 
 	return videoId;
