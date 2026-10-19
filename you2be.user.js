@@ -1,10 +1,11 @@
+/// <reference types="tampermonkey" />
 // ==UserScript==
 // @name           YouTube Fastener
 // @name:ru        YouTube Ускоритель
 // @description    Surf YouTube faster
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
-// @version        1.0.4
+// @version        1.0.5
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @updateURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.ico
@@ -17,6 +18,7 @@
 // @match          http*://www.youtube.com/watch?*
 // @grant GM.getValue
 // @grant GM.setValue
+// @grant GM.addValueChangeListener
 // @grant GM.registerMenuCommand
 // @grant GM.unregisterMenuCommand
 // @run-at         document-start
@@ -48,40 +50,53 @@
 
 	const translation = i18n[getLang()];
 
+	const url = new URL(location.href);
+	const keptParams = ["v", "t", "list", "index"];
 	const keepShortsId = "keepShorts";
 	let keepShorts = await GM.getValue(keepShortsId, false);
+
+	async function unregisterMenu() {
+		await GM.unregisterMenuCommand(keepShortsId);
+	}
 
 	async function registerMenu() {
 		const caption = keepShorts
 			? translation.keepShortsOn
 			: translation.keepShortsOff;
-		GM.registerMenuCommand(
+		await GM.registerMenuCommand(
 			caption,
 			async () => {
-				keepShorts = !keepShorts;
-				await GM.setValue(keepShortsId, keepShorts);
-				GM.unregisterMenuCommand(keepShortsId);
-				await registerMenu();
-				location.reload();
+				await GM.setValue(keepShortsId, !keepShorts);
 			},
 			{ id: keepShortsId },
 		);
 	}
 	await registerMenu();
 
-	const url = new URL(location.href);
-	const keptParams = ["v", "t", "list", "index"];
+	await GM.addValueChangeListener(
+		keepShortsId,
+		async (_name, _old, _new, remote) => {
+			keepShorts = !keepShorts;
+			if (!remote && url.pathname.startsWith("/shorts/")) {
+				location.reload();
+			} else {
+				await unregisterMenu();
+				await registerMenu();
+			}
+		},
+	);
 
 	/**
-	 * Removes all extra query params
+	 * Removes all extra query parameters
 	 * @param {URL} target
 	 * @param {URL} source
 	 * @returns {URL}
 	 */
 	function cleanParams(target, source) {
 		for (const key of keptParams) {
-			if (source.searchParams.has(key)) {
-				target.searchParams.set(key, source.searchParams.get(key));
+			const value = source.searchParams.get(key);
+			if (source.searchParams.has(key) && value) {
+				target.searchParams.set(key, value);
 			}
 		}
 		return target;
