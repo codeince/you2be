@@ -5,7 +5,7 @@
 // @description    Surf YouTube faster
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
-// @version        1.0.6
+// @version        1.0.7
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @updateURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.ico
@@ -18,6 +18,7 @@
 // @grant GM.addValueChangeListener
 // @grant GM.registerMenuCommand
 // @grant GM.unregisterMenuCommand
+// @grant window.onurlchange
 // @run-at         document-start
 // ==/UserScript==
 
@@ -128,7 +129,7 @@ async function run(url) {
 			keepShorts = !keepShorts;
 			if (
 				!remote &&
-				location.hostname.endsWith("youtube.com") &&
+				url.hostname.endsWith("youtube.com") &&
 				url.pathname.startsWith("/shorts/")
 			) {
 				location.reload();
@@ -148,7 +149,7 @@ async function run(url) {
 	if (videoId) {
 		if (
 			keepShorts &&
-			location.hostname.endsWith("youtube.com") &&
+			url.hostname.endsWith("youtube.com") &&
 			url.pathname.startsWith("/shorts/")
 		) {
 			target.pathname = `/shorts/${videoId}`;
@@ -175,4 +176,9 @@ async function launch() {
 }
 
 launch();
-window.addEventListener("yt-navigate-start", launch);
+if (window.onurlchange === null) {
+	window.addEventListener("urlchange", async () => {
+		window.stop();
+		await launch();
+	});
+}
