@@ -5,7 +5,7 @@
 // @description    Surf YouTube faster
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
-// @version        1.0.7
+// @version        1.0.8
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @updateURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.ico
@@ -117,12 +117,20 @@ async function registerMenu() {
 }
 
 /**
+ * Is this link a supported video link
+ * @param {URL} url
+ * @returns {boolean} is video
+ */
+function isVideoLink(url) {
+	return getVideoId(url) || url.pathname === "/watch";
+}
+
+/**
  * Run
  * @param {URL} url
+ * @returns {Promise<boolean>} redirected
  */
 async function run(url) {
-	await unregisterMenu();
-	await registerMenu();
 	await GM.addValueChangeListener(
 		keepShortsId,
 		async (_name, _old, _new, remote) => {
@@ -163,22 +171,34 @@ async function run(url) {
 	if (target.href !== url.href) {
 		location.replace(target.href);
 	}
+
+	return target.href !== url.href;
 }
 
-async function launch() {
-	if (
-		getVideoId(location) ||
-		(location.hostname.endsWith("youtube.com") &&
-			location.pathname === "/watch")
-	) {
-		await run(new URL(location.href));
-	}
-}
+unregisterMenu();
+registerMenu();
 
-launch();
+const url = new URL(location.href);
+if (isVideoLink(url)) run();
 if (window.onurlchange === null) {
-	window.addEventListener("urlchange", async () => {
-		window.stop();
-		await launch();
+  window.addEventListener("urlchange", async () => {
+    const url = new URL(location.href);
+    if (isVideoLink(url)) {
+      await run(url);
+    }
+  })
+	window.addEventListener("click", async (event) => {
+		const link = event.target?.closest("a[href]");
+		if (!link) return;
+		const url = new URL(link.getAttribute("href"), "https://youtube.com");
+
+		if (isVideoLink(url)) {
+			event.preventDefault();
+			event.stopImmediatePropagation();
+
+			if (!(await run(url))) {
+				location.assign(url);
+			}
+		}
 	});
 }
