@@ -5,7 +5,7 @@
 // @description    Surf YouTube faster
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
-// @version        1.1.0
+// @version        1.1.1
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @updateURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.png
@@ -168,7 +168,6 @@ async function run(url) {
   await GM.addValueChangeListener(
     settings.data.keepShorts.id,
     async (_name, _old, _new, remote) => {
-      await settings.data.keepShorts.setValue(!(await settings.data.keepShorts.getValue()));
       if (!remote && url.hostname.endsWith("youtube.com") && url.pathname.startsWith("/shorts/")) {
         location.reload();
       } else {
