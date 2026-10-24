@@ -5,10 +5,10 @@
 // @description    Surf YouTube faster
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
-// @version        1.0.8
+// @version        1.0.9
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @updateURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
-// @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.ico
+// @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.png
 // @match          http*://youtu.be/*
 // @match          http*://youtube.com/*
 // @match          http*://m.youtube.com/*
@@ -22,7 +22,31 @@
 // @run-at         document-start
 // ==/UserScript==
 
-const keepShortsId = "keepShorts";
+class Setting {
+  id;
+  default;
+
+  constructor(id, default_value) {
+    this.id = id;
+    this.default = default_value;
+  }
+
+  async getValue() {
+    return await GM.getValue(this.id, this.default);
+  }
+
+  async setValue(new_value) {
+    await GM.setValue(this.id, new_value);
+  }
+}
+
+const settings = {
+  id: "settings",
+  data: {
+    keepShorts: new Setting("keepShorts", false),
+    keptParams: new Setting("keptParams", ["v", "t", "list", "index"]),
+  },
+};
 
 /**
  * Adds s if t query parameter is just a number
@@ -30,11 +54,11 @@ const keepShortsId = "keepShorts";
  * @returns {URL}
  */
 function betterTime(source) {
-	const value = source.searchParams.get("t");
-	if (/^[0-9]*$/.test(value)) {
-		source.searchParams.set("t", `${value}s`);
-	}
-	return source;
+  const value = source.searchParams.get("t");
+  if (/^[0-9]*$/.test(value)) {
+    source.searchParams.set("t", `${value}s`);
+  }
+  return source;
 }
 
 /**
@@ -43,44 +67,44 @@ function betterTime(source) {
  * @returns {string|null}
  */
 function getVideoId(source) {
-	let videoId = null;
-	if (source.hostname === "youtu.be") {
-		videoId = source.pathname.split("/").filter(Boolean)[0] ?? null;
-	} else if (source.hostname.endsWith("youtube.com")) {
-		const match = source.pathname.match(/^\/shorts\/([^/?]+)/);
-		if (match) {
-			videoId = match[1];
-		}
-	}
-	return videoId;
+  let videoId = null;
+  if (source.hostname === "youtu.be") {
+    videoId = source.pathname.split("/").filter(Boolean)[0] ?? null;
+  } else if (source.hostname.endsWith("youtube.com")) {
+    const match = source.pathname.match(/^\/shorts\/([^/?]+)/);
+    if (match) {
+      videoId = match[1];
+    }
+  }
+  return videoId;
 }
 
 /**
  * Removes all extra query parameters
  * @param {URL} target
  * @param {URL} source
+ * @param {[string]} keptParams
  * @returns {URL}
  */
-function cleanParams(target, source) {
-	const keptParams = ["v", "t", "list", "index"];
-	for (const key of keptParams) {
-		const value = source.searchParams.get(key);
-		if (source.searchParams.has(key) && value) {
-			target.searchParams.set(key, value);
-		}
-	}
-	return target;
+function cleanParams(target, source, keptParams) {
+  for (const key of keptParams) {
+    const value = source.searchParams.get(key);
+    if (source.searchParams.has(key) && value) {
+      target.searchParams.set(key, value);
+    }
+  }
+  return target;
 }
 
 const i18n = {
-	en: {
-		keepShortsOn: "Shorts in menu",
-		keepShortsOff: "Shorts in default video player",
-	},
-	ru: {
-		keepShortsOn: "Shorts в меню",
-		keepShortsOff: "Shorts в окне обычных видео",
-	},
+  en: {
+    keepShortsOn: "Shorts in menu",
+    keepShortsOff: "Shorts in default video player",
+  },
+  ru: {
+    keepShortsOn: "Shorts в меню",
+    keepShortsOff: "Shorts в окне обычных видео",
+  },
 };
 
 /**
@@ -88,32 +112,31 @@ const i18n = {
  * @returns {string}
  */
 function getLang() {
-	const ytLang = document.documentElement.lang?.split("-")[0];
-	if (ytLang && i18n[ytLang]) return ytLang;
-	const navLang = navigator.language.split("-")[0];
-	if (i18n[navLang]) return navLang;
-	return "en";
+  const ytLang = document.documentElement.lang?.split("-")[0];
+  if (ytLang && i18n[ytLang]) return ytLang;
+  const navLang = navigator.language.split("-")[0];
+  if (i18n[navLang]) return navLang;
+  return "en";
 }
 
 const translation = i18n[getLang()];
 
-let keepShorts = await GM.getValue(keepShortsId, false);
-
 async function unregisterMenu() {
-	await GM.unregisterMenuCommand(keepShortsId);
+  await GM.unregisterMenuCommand(settings.data.keepShorts.id);
 }
 
 async function registerMenu() {
-	const caption = keepShorts
-		? translation.keepShortsOn
-		: translation.keepShortsOff;
-	await GM.registerMenuCommand(
-		caption,
-		async () => {
-			await GM.setValue(keepShortsId, !keepShorts);
-		},
-		{ id: keepShortsId },
-	);
+  const keepShorts = await settings.data.keepShorts.getValue();
+  const caption = keepShorts ? translation.keepShortsOn : translation.keepShortsOff;
+  await GM.registerMenuCommand(
+    caption,
+    async () => {
+      await settings.data.keepShorts.setValue(!(await settings.data.keepShorts.getValue()));
+    },
+    {
+      id: settings.data.keepShorts.id,
+    },
+  );
 }
 
 /**
@@ -122,7 +145,7 @@ async function registerMenu() {
  * @returns {boolean} is video
  */
 function isVideoLink(url) {
-	return getVideoId(url) || url.pathname === "/watch";
+  return getVideoId(url) || url.pathname === "/watch";
 }
 
 /**
@@ -131,48 +154,44 @@ function isVideoLink(url) {
  * @returns {Promise<boolean>} redirected
  */
 async function run(url) {
-	await GM.addValueChangeListener(
-		keepShortsId,
-		async (_name, _old, _new, remote) => {
-			keepShorts = !keepShorts;
-			if (
-				!remote &&
-				url.hostname.endsWith("youtube.com") &&
-				url.pathname.startsWith("/shorts/")
-			) {
-				location.reload();
-			} else {
-				await unregisterMenu();
-				await registerMenu();
-			}
-		},
-	);
+  await GM.addValueChangeListener(
+    settings.data.keepShorts.id,
+    async (_name, _old, _new, remote) => {
+      await settings.data.keepShorts.setValue(!(await settings.data.keepShorts.getValue()));
+      if (!remote && url.hostname.endsWith("youtube.com") && url.pathname.startsWith("/shorts/")) {
+        location.reload();
+      } else {
+        await unregisterMenu();
+        await registerMenu();
+      }
+    },
+  );
 
-	const target = new URL(
-		"/watch",
-		url.hostname === "youtu.be" ? "https://youtube.com" : url.origin,
-	);
+  const target = new URL(
+    "/watch",
+    url.hostname === "youtu.be" ? "https://youtube.com" : url.origin,
+  );
 
-	const videoId = getVideoId(url);
-	if (videoId) {
-		if (
-			keepShorts &&
-			url.hostname.endsWith("youtube.com") &&
-			url.pathname.startsWith("/shorts/")
-		) {
-			target.pathname = `/shorts/${videoId}`;
-		} else {
-			target.searchParams.set("v", videoId);
-		}
-	}
-	cleanParams(target, url);
-	betterTime(target);
+  const videoId = getVideoId(url);
+  if (videoId) {
+    if (
+      (await settings.data.keepShorts.getValue()) &&
+      url.hostname.endsWith("youtube.com") &&
+      url.pathname.startsWith("/shorts/")
+    ) {
+      target.pathname = `/shorts/${videoId}`;
+    } else {
+      target.searchParams.set("v", videoId);
+    }
+  }
+  cleanParams(target, url, await settings.data.keptParams.getValue());
+  betterTime(target);
 
-	if (target.href !== url.href) {
-		location.replace(target.href);
-	}
+  if (target.href !== url.href) {
+    location.replace(target.href);
+  }
 
-	return target.href !== url.href;
+  return target.href !== url.href;
 }
 
 unregisterMenu();
@@ -186,19 +205,19 @@ if (window.onurlchange === null) {
     if (isVideoLink(url)) {
       await run(url);
     }
-  })
-	window.addEventListener("click", async (event) => {
-		const link = event.target?.closest("a[href]");
-		if (!link) return;
-		const url = new URL(link.getAttribute("href"), "https://youtube.com");
+  });
+  window.addEventListener("click", async (event) => {
+    const link = event.target?.closest("a[href]");
+    if (!link) return;
+    const url = new URL(link.getAttribute("href"), "https://youtube.com");
 
-		if (isVideoLink(url)) {
-			event.preventDefault();
-			event.stopImmediatePropagation();
+    if (isVideoLink(url)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
 
-			if (!(await run(url))) {
-				location.assign(url);
-			}
-		}
-	});
+      if (!(await run(url))) {
+        location.assign(url);
+      }
+    }
+  });
 }
