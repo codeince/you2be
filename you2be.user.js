@@ -5,7 +5,7 @@
 // @description    Surf YouTube faster
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
-// @version        1.0.9
+// @version        1.1.0
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @updateURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.png
@@ -32,11 +32,22 @@ class Setting {
   }
 
   async getValue() {
-    return await GM.getValue(this.id, this.default);
+    let value = await GM.getValue(this.id, this.default);
+
+    if (typeof value !== typeof this.default) {
+      alert(`You setted ${this.id} to different value type\nValue was equal to ${value}`);
+      value = this.default;
+      await this.setValue(this.default);
+    }
+
+    return value;
   }
 
   async setValue(new_value) {
-    await GM.setValue(this.id, new_value);
+    if (typeof new_value === typeof this.default) {
+      alert(`You setted ${this.id} to different value type\nValue was equal to ${value}`);
+      await GM.setValue(this.id, new_value);
+    }
   }
 }
 
