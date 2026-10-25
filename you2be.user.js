@@ -5,7 +5,7 @@
 // @description    Surf YouTube faster
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
-// @version        1.1.2
+// @version        1.1.3
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @updateURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.png
@@ -219,7 +219,10 @@ if (window.onurlchange === null) {
   window.addEventListener("click", async (event) => {
     const link = event.target?.closest("a[href]");
     if (!link) return;
-    const url = new URL(link.getAttribute("href"), "https://youtube.com");
+    const url = new URL(link.getAttribute("href"));
+    if (url.origin === "") {
+      url.origin = "https://youtube.com";
+    }
 
     if (isVideoLink(url)) {
       event.preventDefault();
