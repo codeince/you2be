@@ -6,7 +6,7 @@
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
 // @author         Code Slasher Incorporation
-// @version        1.1.5
+// @version        1.1.6
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @updateURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.png
@@ -169,10 +169,9 @@ function isVideoLink(url) {
 /**
  * Run
  * @param {URL} url
- * @param {(target: URL) => void} callback
  * @returns {Promise<boolean>} redirected
  */
-async function run(url, callback) {
+async function run(url) {
   await GM.addValueChangeListener(
     settings.data.keepShorts.id,
     async (_name, _old, _new, remote) => {
@@ -208,7 +207,9 @@ async function run(url, callback) {
   const redirected = target.href !== url.href && !sessionStorage.getItem(cleanSessionId);
   if (redirected) {
     sessionStorage.setItem(cleanSessionId, true);
-    callback(target);
+    location.assign(
+      url.hostname.endsWith("youtube.com") ? `${target.pathname}${target.search}` : target.href,
+    );
     setTimeout(() => sessionStorage.removeItem(cleanSessionId), 100);
   }
 
@@ -222,9 +223,7 @@ async function run(url, callback) {
 
 const url = new URL(location.href);
 if (isVideoLink(url)) {
-  run(url, (target) => {
-    location.assign(target);
-  });
+  run(url);
 }
 if (window.onurlchange === null) {
   window.addEventListener("urlchange", async () => {
@@ -232,9 +231,7 @@ if (window.onurlchange === null) {
 
     const url = new URL(location.href);
     if (isVideoLink(url)) {
-      await run(url, (target) => {
-        location.assign(target);
-      });
+      await run(url);
     }
   });
 }
@@ -251,8 +248,6 @@ window.addEventListener("click", async (event) => {
   if (isVideoLink(url)) {
     event.preventDefault();
 
-    await run(url, (target) => {
-      location.assign(`${target.pathname}${target.search}`);
-    });
+    await run(url);
   }
 });
