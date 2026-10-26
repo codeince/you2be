@@ -5,7 +5,7 @@
 // @description    Surf YouTube faster
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
-// @version        1.1.4
+// @version        1.1.5
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @updateURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.png
@@ -56,6 +56,7 @@ class Setting {
   }
 }
 
+const cleanSessionId = "ytf:clean";
 const settings = {
   id: "settings",
   data: {
@@ -99,7 +100,7 @@ function getVideoId(source) {
  * Removes all extra query parameters
  * @param {URL} target
  * @param {URL} source
- * @param {[string]} keptParams
+ * @param {string[]} keptParams
  * @returns {URL}
  */
 function cleanParams(target, source, keptParams) {
@@ -167,9 +168,10 @@ function isVideoLink(url) {
 /**
  * Run
  * @param {URL} url
+ * @param {(target: URL) => void} callback
  * @returns {Promise<boolean>} redirected
  */
-async function run(url) {
+async function run(url, callback) {
   await GM.addValueChangeListener(
     settings.data.keepShorts.id,
     async (_name, _old, _new, remote) => {
@@ -202,40 +204,54 @@ async function run(url) {
   cleanParams(target, url, await settings.data.keptParams.getValue());
   betterTime(target);
 
-  if (target.href !== url.href) {
-    location.replace(target.href);
+  const redirected = target.href !== url.href && !sessionStorage.getItem(cleanSessionId);
+  if (redirected) {
+    sessionStorage.setItem(cleanSessionId, true);
+    callback(target);
+    setTimeout(() => sessionStorage.removeItem(cleanSessionId), 100);
   }
 
-  return target.href !== url.href;
+  return redirected;
 }
 
-unregisterMenu();
-registerMenu();
+(async () => {
+  unregisterMenu();
+  registerMenu();
+})();
 
 const url = new URL(location.href);
-if (isVideoLink(url)) run();
+if (isVideoLink(url)) {
+  run(url, (target) => {
+    location.assign(target);
+  });
+}
 if (window.onurlchange === null) {
   window.addEventListener("urlchange", async () => {
+    if (sessionStorage.getItem(cleanSessionId)) return;
+
     const url = new URL(location.href);
     if (isVideoLink(url)) {
-      await run(url);
-    }
-  });
-  window.addEventListener("click", async (event) => {
-    const link = event.target?.closest("a[href]");
-    if (!link) return;
-    const url = new URL(link.getAttribute("href"));
-    if (url.origin === "") {
-      url.origin = "https://youtube.com";
-    }
-
-    if (isVideoLink(url)) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-
-      if (!(await run(url))) {
-        location.assign(url);
-      }
+      await run(url, (target) => {
+        location.assign(target);
+      });
     }
   });
 }
+window.addEventListener("click", async (event) => {
+  if (sessionStorage.getItem(cleanSessionId)) return;
+
+  const link = event.target?.closest("a[href]");
+  if (!link) return;
+  const url = new URL(link.getAttribute("href"));
+  if (url.origin === "") {
+    url.origin = "https://youtube.com";
+  }
+
+  if (isVideoLink(url)) {
+    event.preventDefault();
+
+    await run(url, (target) => {
+      location.assign(`${target.pathname}${target.search}`);
+    });
+  }
+});
