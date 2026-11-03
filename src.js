@@ -6,7 +6,7 @@
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
 // @author         Code Slasher Incorporation
-// @version        1.1.6
+// @version        1.1.8
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @updateURL      https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.png
@@ -67,7 +67,7 @@ const settings = {
   id: "settings",
   data: {
     keepShorts: new Setting("keepShorts", false),
-    keptParams: new Setting("keptParams", ["v", "t", "list", "index"]),
+    keptParams: new Setting("keptParams", { v: [], t: [], list: [], index: ["start_radio"] }),
   },
 };
 
@@ -106,13 +106,19 @@ function getVideoId(source) {
  * Removes all extra query parameters
  * @param {URL} target
  * @param {URL} source
- * @param {string[]} keptParams
+ * @param {Record<string, string[]>} keptParams
  * @returns {URL}
  */
 function cleanParams(target, source, keptParams) {
-  for (const key of keptParams) {
-    const value = source.searchParams.get(key);
-    if (source.searchParams.has(key) && value) {
+  for (const [key, values] of Object.entries(keptParams)) {
+    let value = source.searchParams.get(key);
+
+    for (const extraKey of values) {
+      if (value) break;
+      value = source.searchParams.get(extraKey);
+    }
+
+    if (value) {
       target.searchParams.set(key, value);
     }
   }
