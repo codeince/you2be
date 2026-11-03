@@ -6,7 +6,7 @@
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
 // @author         Code Slasher Incorporation
-// @version        1.1.9
+// @version        1.2.0
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @updateURL      https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.png
@@ -246,7 +246,7 @@ async function run(url, keptParams, callback) {
 
   const redirected = target.href !== url.href && !sessionStorage.getItem(cleanSessionId);
   if (redirected) {
-    sessionStorage.setItem(cleanSessionId, true);
+    sessionStorage.setItem(cleanSessionId, "1");
     location.assign(
       url.hostname.endsWith("youtube.com") ? `${target.pathname}${target.search}` : target.href,
     );
@@ -261,10 +261,13 @@ async function run(url, keptParams, callback) {
   registerMenu();
 })();
 
+sessionStorage.removeItem(cleanSessionId);
 const url = new URL(location.href);
-if (isVideoLink(url)) {
-  (async () => await run(url, await settings.data.keptParams.getValue()))();
-}
+(async () => {
+  if (isVideoLink(url)) {
+    await run(url, await settings.data.keptParams.getValue());
+  }
+})();
 if ("onurlchange" in window) {
   window.addEventListener("urlchange", async () => {
     if (sessionStorage.getItem(cleanSessionId)) return;
