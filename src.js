@@ -6,7 +6,7 @@
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
 // @author         Code Slasher Incorporation
-// @version        1.2.0
+// @version        1.2.1
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @updateURL      https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.png
@@ -24,6 +24,7 @@
 // @run-at         document-start
 // ==/UserScript==
 
+/** @template T */
 class Setting {
   id;
   default;
@@ -31,13 +32,17 @@ class Setting {
   /**
    * Creates a setting
    * @param {string} id
-   * @param {any} default_value
+   * @param {T} default_value
    */
   constructor(id, default_value) {
     this.id = id;
     this.default = default_value;
   }
 
+  /**
+   * Gets value of setting
+   * @returns {Promise<T>} value
+   */
   async getValue() {
     let value = await GM.getValue(this.id, this.default);
 
@@ -52,6 +57,10 @@ class Setting {
     return value;
   }
 
+  /**
+   * Sets a new setting value
+   * @param {T} new_value
+   */
   async setValue(new_value) {
     if (typeof new_value === typeof this.default) {
       await GM.setValue(this.id, new_value);
@@ -65,9 +74,8 @@ class Setting {
 
 /** @type {URL|null} */
 let lastLink = null;
-const cleanSessionId = "ytf:clean";
 const settings = {
-  id: "settings",
+  id: "ytf",
   data: {
     keepShorts: new Setting("keepShorts", false),
     keptParams: new Setting("keptParams", { v: [], t: [], list: [], index: ["start_radio"] }),
@@ -244,33 +252,39 @@ async function run(url, keptParams, callback) {
     return false;
   }
 
-  const redirected = target.href !== url.href && !sessionStorage.getItem(cleanSessionId);
+  const redirected = target.href !== url.href;
   if (redirected) {
-    sessionStorage.setItem(cleanSessionId, "1");
+    sessionStorage.setItem(`${settings.id}:redirected`, "1");
     location.assign(
       url.hostname.endsWith("youtube.com") ? `${target.pathname}${target.search}` : target.href,
     );
-    setTimeout(() => sessionStorage.removeItem(cleanSessionId), 100);
+    window.addEventListener("load", () => sessionStorage.removeItem(`${settings.id}:redirected`), {
+      once: true,
+    });
   }
 
   return redirected;
 }
 
+const url = new URL(location.href);
 (async () => {
   unregisterMenu();
   registerMenu();
-})();
 
-sessionStorage.removeItem(cleanSessionId);
-const url = new URL(location.href);
-(async () => {
+  if (sessionStorage.getItem(`${settings.id}:redirected`)) {
+    window.addEventListener("load", () => sessionStorage.removeItem(`${settings.id}:redirected`), {
+      once: true,
+    });
+    return;
+  }
+
   if (isVideoLink(url)) {
     await run(url, await settings.data.keptParams.getValue());
   }
 })();
 if ("onurlchange" in window) {
   window.addEventListener("urlchange", async () => {
-    if (sessionStorage.getItem(cleanSessionId)) return;
+    if (sessionStorage.getItem(`${settings.id}:redirected`)) return;
 
     const url = new URL(location.href);
     if (isVideoLink(url)) {
@@ -279,7 +293,7 @@ if ("onurlchange" in window) {
   });
 }
 window.addEventListener("click", async (event) => {
-  if (sessionStorage.getItem(cleanSessionId)) return;
+  if (sessionStorage.getItem(`${settings.id}:redirected`)) return;
 
   const link = event.target?.closest("a[href]");
   if (!link) return;
