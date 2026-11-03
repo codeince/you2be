@@ -6,7 +6,7 @@
 // @description:ru Гоняй быстрее по YouTube
 // @namespace      https://github.com/codeince/you2be
 // @author         Code Slasher Incorporation
-// @version        1.1.8
+// @version        1.1.9
 // @downloadURL    https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @updateURL      https://raw.githubusercontent.com/codeince/you2be/main/you2be.user.js
 // @icon           https://raw.githubusercontent.com/codeince/you2be/main/icon.png
@@ -14,9 +14,10 @@
 // @match          http*://youtube.com/*
 // @match          http*://m.youtube.com/*
 // @match          http*://www.youtube.com/*
-// @grant          GM.getValue
-// @grant          GM.setValue
 // @grant          GM.addValueChangeListener
+// @grant          GM.getValue
+// @grant          GM.setClipboard
+// @grant          GM.setValue
 // @grant          GM.registerMenuCommand
 // @grant          GM.unregisterMenuCommand
 // @grant          window.onurlchange
@@ -62,12 +63,17 @@ class Setting {
   }
 }
 
+/** @type {URL|null} */
+let lastLink = null;
 const cleanSessionId = "ytf:clean";
 const settings = {
   id: "settings",
   data: {
     keepShorts: new Setting("keepShorts", false),
     keptParams: new Setting("keptParams", { v: [], t: [], list: [], index: ["start_radio"] }),
+    shareKeptParams: new Setting("shareKeptParams", {
+      v: [],
+    }),
   },
 };
 
@@ -129,10 +135,12 @@ const i18n = {
   en: {
     keepShortsOn: "Shorts in menu",
     keepShortsOff: "Shorts in default video player",
+    share: "Share",
   },
   ru: {
     keepShortsOn: "Shorts в меню",
     keepShortsOff: "Shorts в окне обычных видео",
+    share: "Поделиться",
   },
 };
 
@@ -152,6 +160,7 @@ const translation = i18n[getLang()];
 
 async function unregisterMenu() {
   await GM.unregisterMenuCommand(settings.data.keepShorts.id);
+  await GM.unregisterMenuCommand("share");
 }
 
 async function registerMenu() {
@@ -165,6 +174,19 @@ async function registerMenu() {
     {
       id: settings.data.keepShorts.id,
     },
+  );
+  await GM.registerMenuCommand(
+    translation.share,
+    async () => {
+      const url = lastLink ?? new URL(location.href);
+      lastLink = null;
+      await run(
+        url,
+        await settings.data.shareKeptParams.getValue(),
+        async (url) => await GM.setClipboard(url.href, "text"),
+      );
+    },
+    { id: "share" },
   );
 }
 
@@ -180,9 +202,11 @@ function isVideoLink(url) {
 /**
  * Run
  * @param {URL} url
+ * @param {Record<string, string[]>} keptParams
+ * @param {(url: URL) => Promise<void> | undefined} callback
  * @returns {Promise<boolean>} redirected
  */
-async function run(url) {
+async function run(url, keptParams, callback) {
   await GM.addValueChangeListener(
     settings.data.keepShorts.id,
     async (_name, _old, _new, remote) => {
@@ -212,8 +236,13 @@ async function run(url) {
       target.searchParams.set("v", videoId);
     }
   }
-  cleanParams(target, url, await settings.data.keptParams.getValue());
+  cleanParams(target, url, keptParams);
   betterTime(target);
+
+  if (typeof callback === "function") {
+    await callback(target);
+    return false;
+  }
 
   const redirected = target.href !== url.href && !sessionStorage.getItem(cleanSessionId);
   if (redirected) {
@@ -234,15 +263,15 @@ async function run(url) {
 
 const url = new URL(location.href);
 if (isVideoLink(url)) {
-  run(url);
+  (async () => await run(url, await settings.data.keptParams.getValue()))();
 }
-if (window.onurlchange === null) {
+if ("onurlchange" in window) {
   window.addEventListener("urlchange", async () => {
     if (sessionStorage.getItem(cleanSessionId)) return;
 
     const url = new URL(location.href);
     if (isVideoLink(url)) {
-      await run(url);
+      await run(url, await settings.data.keptParams.getValue());
     }
   });
 }
@@ -251,14 +280,31 @@ window.addEventListener("click", async (event) => {
 
   const link = event.target?.closest("a[href]");
   if (!link) return;
-  const url = new URL(link.getAttribute("href"));
-  if (url.origin === "") {
-    url.origin = "https://youtube.com";
-  }
+  const url = new URL(link.getAttribute("href"), location.origin);
 
   if (isVideoLink(url)) {
     event.preventDefault();
 
-    await run(url);
+    await run(url, await settings.data.keptParams.getValue());
   }
 });
+
+window.addEventListener(
+  "contextmenu",
+  (event) => {
+    const target = event.target?.closest("a[href]");
+    if (!target) return;
+    let url = new URL(target.getAttribute("href"), location.origin);
+    if (isVideoLink(url)) {
+      lastLink = url;
+      document.body.addEventListener(
+        "click",
+        () => {
+          lastLink = null;
+        },
+        { once: true },
+      );
+    }
+  },
+  true,
+);
